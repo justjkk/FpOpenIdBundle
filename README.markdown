@@ -112,17 +112,19 @@ Supports these 3rd party libraries:
 
         public function approveUserAccount($request)
         {
-            $tokenPersister = $this->get('fp_openid.security.authentication.token_persister');
-
-            $token = $tokenPersister->get();
+            $securityContext = $this->get('security.context');
+            $token = $securityContext->getToken();
+            if (false == $token instanceof OpenIdToken) {
+                throw new $this->createNotFoundException('The approve controller cannot be used without an open id token in security context');
+            }
 
             $user = $this->get('user.repository')->findBy(array('email' => $token->getAttribute('contact/email')));
 
-            // IMPORTANT: It is required to set a user to token (UserInterface)
-            $newToken = new OpenIdToken($token->getOpenIdentifier(), $user->getRoles());
+            // IMPORTANT: it is important not to grant authentication to the token, so you should set third parameter to false
+            $newToken = new OpenIdToken($token->getOpenIdentifier(), $user->getRoles(), false);
             $newToken->setUser($user);
 
-            $tokenPersister->set($newToken);
+            $securityContext->setToken($newToken);
 
             // IMPORTANT: It is required make a redirect to `login_check` with parameter `openid_approved`
             return $this->redirect($this->generateUrl('login_check_route', array('openid_approved' => 1)));
