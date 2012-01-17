@@ -23,11 +23,17 @@ class OpenIdAuthenticationListener extends AbstractAuthenticationListener
     protected $dispatcher;
 
     /**
+     * @var \Symfony\Component\Security\Core\SecurityContext
+     */
+    protected $securityContext;
+
+    /**
      * {@inheritdoc}
      */
     public function __construct(SecurityContextInterface $securityContext, AuthenticationManagerInterface $authenticationManager, SessionAuthenticationStrategyInterface $sessionStrategy, HttpUtils $httpUtils, $providerKey, array $options = array(), AuthenticationSuccessHandlerInterface $successHandler = null, AuthenticationFailureHandlerInterface $failureHandler = null, LoggerInterface $logger = null, EventDispatcherInterface $dispatcher = null)
     {
         $this->dispatcher = $dispatcher;
+        $this->securityContext = $securityContext;
 
         parent::__construct($securityContext, $authenticationManager, $sessionStrategy, $httpUtils, $providerKey, $options, $successHandler, $failureHandler, $logger, $dispatcher);
     }
@@ -51,7 +57,8 @@ class OpenIdAuthenticationListener extends AbstractAuthenticationListener
         if($result instanceof OpenIdToken && $url = $result->getAuthenticateUrl()) {
             return $this->httpUtils->createRedirectResponse($request, $url);
         }
-        if($result instanceof OpenIdToken && $url = $result->getApproveUrl()) {
+        if($result instanceof OpenIdToken && false == $result->isAuthenticated() && $url = $result->getApproveUrl()) {
+            $this->securityContext->setToken($result);
             return $this->httpUtils->createRedirectResponse($request, $url);
         }
         if($result instanceof OpenIdToken && $url = $result->getCancelUrl()) {
@@ -79,10 +86,13 @@ class OpenIdAuthenticationListener extends AbstractAuthenticationListener
             $token = new OpenIdToken($identifier);
             $token->setState('complete');
         } elseif ($identifier = $request->get("openid_approved", false)) {
+            if ($this->securityContext->getToken() instanceof OpenIdToken) {
+                $token = $this->securityContext->getToken();
+            } else {
+                $token = new OpenIdToken($identifier);
+            }
 
-            $token = new OpenIdToken($identifier);
             $token->setState('approved');
-
         }
 
         return $token;

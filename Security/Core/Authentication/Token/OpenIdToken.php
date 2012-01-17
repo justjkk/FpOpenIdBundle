@@ -17,10 +17,10 @@ class OpenIdToken extends AbstractToken
 
     protected $response = array();
 
-    public function __construct($identifier, array $roles = array())
+    public function __construct($identifier, array $roles = array(), $approved = true)
     {
         parent::__construct($roles);
-        parent::setAuthenticated(count($roles) > 0);
+        parent::setAuthenticated(count($roles) > 0 && $approved);
 
         $this->identifier = $identifier;
     }

@@ -21,11 +21,10 @@ class OpenIdAuthenticationProvider implements AuthenticationProviderInterface
 
     protected $parameters;
 
-    public function __construct(ConsumerProvider $consumerProvider, RouterInterface $router, TokenPersister $tokenPersister, array $parameters)
+    public function __construct(ConsumerProvider $consumerProvider, RouterInterface $router, array $parameters)
     {
         $this->consumerProvider = $consumerProvider;
         $this->router = $router;
-        $this->tokenPersister = $tokenPersister;
 
         $this->parameters = array_merge(array(
             'return_route' => null,
@@ -38,6 +37,9 @@ class OpenIdAuthenticationProvider implements AuthenticationProviderInterface
         if (false == $this->supports($token)) {
             return null;
         }
+        if (null == $token->getState()) {
+            return $token;
+        }
 
         $processState = 'process' . ucfirst($token->getState());
 
@@ -49,7 +51,10 @@ class OpenIdAuthenticationProvider implements AuthenticationProviderInterface
         if (false == ($token instanceof OpenIdToken)) {
             return false;
         }
-
+        if (null == $token->getState()) {
+            return true;
+        }
+        
         return in_array($token->getState(), array('verify', 'complete', 'approved', 'cancel'));
     }
 
@@ -73,8 +78,12 @@ class OpenIdAuthenticationProvider implements AuthenticationProviderInterface
         $token->setAttributes($attributes);
 
         if ($this->parameters['approve_route']) {
-            $this->tokenPersister->set($token);
+            $token = new OpenIdToken($attributes['identity'], $this->parameters['roles'], false);
+            $token->setAttributes($attributes);
             $token->setApproveUrl($this->router->generate($this->parameters['approve_route'], array(), true));
+        } else {
+            $token = new OpenIdToken($attributes['identity'], $this->parameters['roles']);
+            $token->setAttributes($attributes);
         }
 
         return $token;
@@ -87,15 +96,10 @@ class OpenIdAuthenticationProvider implements AuthenticationProviderInterface
         return $token;
     }
 
-    public function processApproved(OpenIdToken $token)
+    public function processApproved(OpenIdToken $approvedToken)
     {
-        $token = $this->tokenPersister->get();
-        if (false == $token) {
-            throw new \RuntimeException('The token persister does not contains a token');
-        }
-        if (false == $token->getUser()) {
-            throw new AuthenticationException('Authentication approving was canceled');
-        }
+        $token = new OpenIdToken($approvedToken->getIdentifier(), $approvedToken->getRoles());
+        $token->setUser($approvedToken->getUser());
 
         return $token;
     }
