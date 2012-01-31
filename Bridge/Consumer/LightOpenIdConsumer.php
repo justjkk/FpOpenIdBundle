@@ -30,6 +30,16 @@ class LightOpenIdConsumer implements ConsumerInterface
     }
 
     /**
+     * Check if a fixed identifier is set in config
+     *
+     * @return bool
+     */
+    public function hasConfiguredIdentifier()
+    {
+        return ($this->parameters['identifier'] !== null);
+    }
+
+    /**
      * {@inheritdoc}
      */
     public function changeTrustRoot($trustRoot)
@@ -45,7 +55,7 @@ class LightOpenIdConsumer implements ConsumerInterface
     {
         $lightOpenId = $this->getLightOpenID();
 
-        if ($this->parameters['identifier'] !== null) {
+        if ($this->hasConfiguredIdentifier()) {
             $lightOpenId->identity = $this->parameters['identifier'];
         } else if ($identifier !== null) {
             $lightOpenId->identity = $identifier;
