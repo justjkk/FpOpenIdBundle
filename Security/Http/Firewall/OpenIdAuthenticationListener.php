@@ -11,6 +11,8 @@ use Symfony\Component\Security\Http\Authentication\AuthenticationFailureHandlerI
 use Symfony\Component\Security\Http\Firewall\AbstractAuthenticationListener;
 use Symfony\Component\HttpKernel\Log\LoggerInterface;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+
 
 use Fp\OpenIdBundle\Security\Core\Authentication\Token\OpenIdToken;
 use Fp\OpenIdBundle\Event\AuthenticationEvent;
@@ -55,7 +57,27 @@ class OpenIdAuthenticationListener extends AbstractAuthenticationListener
         $result = $this->authenticationManager->authenticate($token);
 
         if($result instanceof OpenIdToken && $url = $result->getAuthenticateUrl()) {
-            return $this->httpUtils->createRedirectResponse($request, $url);
+            if (count($url) < 4096) {
+                return $this->httpUtils->createRedirectResponse($request, $url);
+            }
+            $postUrl = substr($url, 0, strpos($url, '?'));
+            $parts = parse_url($url);
+            $query = $parts['query'];
+
+            $queryArgs = explode('&', $query);
+            $qa = array();
+            foreach ($queryArgs as $kv) {
+                $kvParts = explode('=', $kv);
+                $qa[$kvParts[0]] = rawurldecode($kvParts[1]);
+            }
+
+            $response = '<html><body onload="document.forms[0].submit();"><form action="';
+            $response .= $postUrl . '" method="POST">';
+            foreach ($qa as $key => $value) {
+                $response .= '<input type="hidden" name="' . $key . '" value="' . $value . '">';
+            }
+            $response .= '<input type="submit" name="continue" value="Continue"></form></body></html>';
+            return new Response($response);
         }
         if($result instanceof OpenIdToken && false == $result->isAuthenticated() && $url = $result->getApproveUrl()) {
             $this->securityContext->setToken($result);
